@@ -337,7 +337,6 @@ public class CameraController : MonoBehaviour
                 maxPitch
             );
 
-
         // カメラに回転を適用
         transform.rotation =
             Quaternion.Euler(
