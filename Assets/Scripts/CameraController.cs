@@ -33,13 +33,32 @@ public class CameraController : MonoBehaviour
     [Header("回転")]
     public float rotateSpeed = 3f;
 
+    // R / Lキーによる回転速度
+    public float keyRotateSpeed = 90f;
+
+    // 上下回転の範囲
+    public float minPitch = -80f;
+    public float maxPitch = 80f;
+
+
+    // =========================
+    // 回転角度
+    // =========================
+
+    // 水平方向
+    private float yaw;
+
+    // 上下方向
+    private float pitch;
+
 
     // =========================
     // 初期状態
     // =========================
 
     private Vector3 startPosition;
-    private Quaternion startRotation;
+    private float startYaw;
+    private float startPitch;
     private float startFOV;
 
 
@@ -49,16 +68,30 @@ public class CameraController : MonoBehaviour
 
     void Start()
     {
-        // ゲーム開始時のカメラ位置を保存
+        // 初期位置
         startPosition = transform.position;
 
-        // ゲーム開始時のカメラ角度を保存
-        startRotation = transform.rotation;
+        // 現在の回転角度を取得
+        Vector3 angles = transform.eulerAngles;
 
-        // Cameraコンポーネントを取得
+        yaw = angles.y;
+
+        // Unityの0～360°を-180～180°に変換
+        pitch = angles.x;
+
+        if (pitch > 180f)
+        {
+            pitch -= 360f;
+        }
+
+        // 初期角度を保存
+        startYaw = yaw;
+        startPitch = pitch;
+
+        // Cameraを取得
         Camera cam = GetComponent<Camera>();
 
-        // ゲーム開始時のFOVを保存
+        // 初期FOV
         startFOV = cam.fieldOfView;
     }
 
@@ -74,6 +107,8 @@ public class CameraController : MonoBehaviour
         ZoomCamera();
 
         RotateCamera();
+
+        KeyboardRotate();
 
         ResetCamera();
     }
@@ -168,31 +203,25 @@ public class CameraController : MonoBehaviour
         }
 
 
-        // 入力がなければ何もしない
+        // 入力がなければ終了
         if (Mathf.Approximately(zoomInput, 0f))
         {
             return;
         }
 
 
-        // Cameraコンポーネント取得
+        // Camera取得
         Camera cam = GetComponent<Camera>();
 
 
-        // -------------------------
-        // FOVを変更
-        // -------------------------
-
+        // FOV変更
         cam.fieldOfView -=
             zoomInput *
             zoomSpeed *
             Time.deltaTime;
 
 
-        // -------------------------
-        // ズーム範囲制限
-        // -------------------------
-
+        // FOV制限
         cam.fieldOfView =
             Mathf.Clamp(
                 cam.fieldOfView,
@@ -203,67 +232,154 @@ public class CameraController : MonoBehaviour
 
 
     // =========================
-    // マウスでカメラ回転
+    // マウスによる回転
     // =========================
 
     void RotateCamera()
     {
         // 右クリック中だけ回転
-        if (Input.GetMouseButton(1))
+        if (!Input.GetMouseButton(1))
         {
-            // マウス移動量
-            float mouseX =
-                Input.GetAxis("Mouse X") *
-                rotateSpeed;
-
-            float mouseY =
-                Input.GetAxis("Mouse Y") *
-                rotateSpeed;
+            return;
+        }
 
 
-            // 上下回転
-            transform.Rotate(
-                -mouseY,
-                0f,
-                0f,
-                Space.Self
+        // -------------------------
+        // マウス入力
+        // -------------------------
+
+        float mouseX =
+            Input.GetAxis("Mouse X") *
+            rotateSpeed;
+
+        float mouseY =
+            Input.GetAxis("Mouse Y") *
+            rotateSpeed;
+
+
+        // -------------------------
+        // 水平方向
+        // -------------------------
+
+        yaw += mouseX;
+
+
+        // -------------------------
+        // 上下方向
+        // -------------------------
+
+        pitch -= mouseY;
+
+
+        // 上下回転を制限
+        pitch =
+            Mathf.Clamp(
+                pitch,
+                minPitch,
+                maxPitch
             );
 
 
-            // 左右回転
-            transform.Rotate(
-                0f,
-                mouseX,
-                0f,
-                Space.World
-            );
+        ApplyRotation();
+    }
+
+
+    // =========================
+    // R / Lキーによる回転
+    // =========================
+
+    void KeyboardRotate()
+    {
+        float rotation = 0f;
+
+
+        // R = 右回転
+        if (Input.GetKey(KeyCode.R))
+        {
+            rotation += keyRotateSpeed;
+        }
+
+
+        // L = 左回転
+        if (Input.GetKey(KeyCode.L))
+        {
+            rotation -= keyRotateSpeed;
+        }
+
+
+        // 回転
+        if (!Mathf.Approximately(rotation, 0f))
+        {
+            yaw +=
+                rotation *
+                Time.deltaTime;
+
+            ApplyRotation();
         }
     }
 
 
     // =========================
-    // Rキーで初期状態に戻す
+    // 回転を適用
+    // =========================
+
+    void ApplyRotation()
+    {
+        // 水平方向は0～360°に整理
+        yaw = Mathf.Repeat(yaw, 360f);
+
+
+        // 上下方向を制限
+        pitch =
+            Mathf.Clamp(
+                pitch,
+                minPitch,
+                maxPitch
+            );
+
+
+        // カメラに回転を適用
+        transform.rotation =
+            Quaternion.Euler(
+                pitch,
+                yaw,
+                0f
+            );
+    }
+
+
+    // =========================
+    // Tキーで初期状態に戻す
     // =========================
 
     void ResetCamera()
     {
-        if (Input.GetKeyDown(KeyCode.R))
+        if (!Input.GetKeyDown(KeyCode.T))
         {
-            // 位置を戻す
-            transform.position =
-                startPosition;
-
-            // 回転を戻す
-            transform.rotation =
-                startRotation;
-
-
-            // FOVを戻す
-            Camera cam =
-                GetComponent<Camera>();
-
-            cam.fieldOfView =
-                startFOV;
+            return;
         }
+
+
+        // 位置を戻す
+        transform.position =
+            startPosition;
+
+
+        // 回転を戻す
+        yaw =
+            startYaw;
+
+        pitch =
+            startPitch;
+
+        ApplyRotation();
+
+
+        // FOVを戻す
+        Camera cam =
+            GetComponent<Camera>();
+
+        cam.fieldOfView =
+            startFOV;
     }
 }
