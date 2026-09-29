@@ -347,6 +347,11 @@ public class CameraController : MonoBehaviour
             );
     }
 
+    public void SetYaw(float targetYaw)
+    {
+        yaw = Mathf.Repeat(targetYaw, 360f);
+        ApplyRotation();
+    }
 
     // =========================
     // Tキーで初期状態に戻す
